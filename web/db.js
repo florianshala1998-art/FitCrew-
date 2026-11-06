@@ -56,7 +56,7 @@ async function hashPw(pw, salt) {
 const randHex = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, '0')).join('');
 
 const gymOf = (id) => T.gyms.find((g) => g.id === id) || null;
-const userOut = (u) => ({ id: u.id, username: u.username, gym_id: u.gym_id, profile: parse(u.profile), gym: gymOf(u.gym_id),
+const userOut = (u) => ({ id: u.id, username: u.username, gym_id: u.gym_id, profile: parse(u.profile), gym: gymOf(u.gym_id), hasRecovery: !!u.recHash, passkey: !!u.passkeys?.length,
   admin: isAdmin(u), superAdmin: u.username.toLowerCase() === SUPER_ADMIN });
 
 function history(userId, key) {
@@ -120,13 +120,62 @@ async function createUser(username, pw, admin = false) {
   T.users.push(u); save('users'); return u;
 }
 
+// ---- account recovery ----
+// Every account gets a recovery code (shown once). Only its hash is stored.
+const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const normCode = (c) => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+async function newRecoveryCode(u) {
+  const raw = [...crypto.getRandomValues(new Uint8Array(12))].map((b) => CODE_ABC[b % CODE_ABC.length]).join('');
+  u.recSalt = randHex(16); u.recHash = await hashPw(raw, u.recSalt); save('users');
+  return raw.match(/.{4}/g).join('-');
+}
+const findUser = (name) => T.users.find((x) => x.username.toLowerCase() === str(name, 40).toLowerCase());
+const setPassword = async (u, pw) => { need(String(pw).length >= 6, 400, 'Passwort: mindestens 6 Zeichen'); u.salt = randHex(16); u.hash = await hashPw(String(pw), u.salt); save('users'); };
+// Accounts made before recovery codes existed have none. On a single-account device the owner may reset it once;
+// afterwards the account has a code and this path is closed.
+const legacyResetAllowed = (u) => !!u && !u.recHash && T.users.length === 1;
+
 route('POST', '/register', false, async ({ body }) => {
   const u = await createUser(str(body.username, 40), String(body.password || ''));
-  localStorage.setItem('fitcrew:uid', u.id); return { user: userOut(u) };
+  const recoveryCode = await newRecoveryCode(u);
+  localStorage.setItem('fitcrew:uid', u.id); return { user: userOut(u), recoveryCode };
 });
 route('POST', '/login', false, async ({ body }) => {
-  const u = T.users.find((x) => x.username.toLowerCase() === str(body.username, 40).toLowerCase());
+  const u = findUser(body.username);
   need(u && (await hashPw(String(body.password || ''), u.salt)) === u.hash, 401, 'Benutzername oder Passwort falsch');
+  localStorage.setItem('fitcrew:uid', u.id); return { user: userOut(u), needsRecovery: !u.recHash };
+});
+route('GET', '/recover-info', false, ({ url }) => {
+  const u = findUser(url.searchParams.get('username'));
+  return { exists: !!u, hasCode: !!u?.recHash, legacy: legacyResetAllowed(u), otherAdmins: T.users.some((x) => x !== u && isAdmin(x)) };
+});
+route('POST', '/recover', false, async ({ body }) => {
+  const u = findUser(body.username); need(u, 404, 'Benutzer nicht gefunden');
+  if (legacyResetAllowed(u)) { /* one-time owner reset, see above */ }
+  else {
+    need(u.recHash, 400, 'Für dieses Konto gibt es keinen Wiederherstellungscode – ein Admin kann das Passwort zurücksetzen.');
+    need((await hashPw(normCode(body.code), u.recSalt)) === u.recHash, 401, 'Wiederherstellungscode stimmt nicht');
+  }
+  await setPassword(u, body.password);
+  const recoveryCode = await newRecoveryCode(u);   // old code is used up
+  localStorage.setItem('fitcrew:uid', u.id); return { user: userOut(u), recoveryCode };
+});
+route('PUT', '/me/password', true, async ({ user, body }) => {
+  need((await hashPw(String(body.old || ''), user.salt)) === user.hash, 401, 'Aktuelles Passwort stimmt nicht');
+  await setPassword(user, body.password); return { ok: true };
+});
+route('POST', '/me/recovery', true, async ({ user, body }) => {
+  need((await hashPw(String(body.password || ''), user.salt)) === user.hash, 401, 'Passwort stimmt nicht');
+  return { recoveryCode: await newRecoveryCode(user) };
+});
+// Face ID / Touch ID via passkey (WebAuthn platform authenticator). Local app: the credential id identifies the user.
+route('GET', '/passkeys', false, () => ({ ids: T.users.flatMap((u) => u.passkeys || []) }));
+route('POST', '/me/passkey', true, ({ user, body }) => {
+  need(typeof body.id === 'string' && body.id.length > 10, 400, 'Ungültiger Schlüssel');
+  user.passkeys = [...new Set([...(user.passkeys || []), body.id])]; save('users'); return { ok: true };
+});
+route('POST', '/login-passkey', false, ({ body }) => {
+  const u = T.users.find((x) => (x.passkeys || []).includes(body.id)); need(u, 401, 'Face ID ist für kein Konto auf diesem Gerät eingerichtet');
   localStorage.setItem('fitcrew:uid', u.id); return { user: userOut(u) };
 });
 route('POST', '/logout', false, () => { localStorage.removeItem('fitcrew:uid'); return { ok: true }; });
