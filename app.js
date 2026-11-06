@@ -73,27 +73,109 @@ async function go(tab) {
 }
 
 // ---------- auth ----------
+const pwField = (name, label, auto, extra = '') => `<label class="f">${label}</label>
+  <div class="pw"><input class="i" type="password" name="${name}" autocomplete="${auto}" required minlength="6" ${extra}><button type="button" class="eye" aria-label="Passwort anzeigen">👁</button></div>`;
+function bindEyes(root = document) {
+  root.querySelectorAll('.eye').forEach((b) => (b.onclick = () => { const i = b.previousElementSibling; i.type = i.type === 'password' ? 'text' : 'password'; b.classList.toggle('on'); }));
+}
 function authView() {
-  return `<div class="auth">
-    <div class="logo">Fit<span>Crew</span></div>
-    <p class="muted">Dein Studio. Deine Geräte. Dein Fortschritt. Dein Coach.<br><span class="small">Alle Daten bleiben auf diesem Gerät.</span></p>
-    <form id="auth" class="card" style="margin-top:20px">
+  const mode = S.authMode || 'login';
+  const head = `<div class="logo">Fit<span>Crew</span></div>
+    <p class="muted">Dein Studio. Deine Geräte. Dein Fortschritt. Dein Coach.<br><span class="small">Alle Daten bleiben auf diesem Gerät.</span></p>`;
+  if (mode === 'register') return `<div class="auth">${head}
+    <form id="auth" class="card" style="margin-top:20px"><b>Neues Konto</b>
       <label class="f">Benutzername</label><input class="i" name="username" autocomplete="username" required autocapitalize="off">
-      <label class="f">Passwort</label><input class="i" type="password" name="password" autocomplete="current-password" required>
-      <button class="btn primary block" style="margin-top:18px" name="go">Anmelden</button>
-      <button type="button" class="btn ghost block" style="margin-top:10px" id="reg">Neues Konto erstellen</button>
+      ${pwField('password', 'Passwort (min. 6 Zeichen)', 'new-password')}
+      ${pwField('password2', 'Passwort wiederholen', 'new-password')}
+      <div class="muted small" style="margin-top:8px">Tipp: Lass iOS ein starkes Passwort vorschlagen – es wird dann im Schlüsselbund gespeichert.</div>
+      <button class="btn primary block" style="margin-top:18px">Konto erstellen</button>
+      <button type="button" class="btn ghost block" style="margin-top:10px" data-mode="login">Ich habe schon ein Konto</button></form></div>`;
+  if (mode === 'forgot') return `<div class="auth">${head}
+    <form id="auth" class="card" style="margin-top:20px"><b>Passwort vergessen</b>
+      <label class="f">Benutzername</label><input class="i" name="username" autocomplete="username" required autocapitalize="off" value="${esc(S.authUser || '')}">
+      <div id="recInfo" class="small muted" style="margin-top:8px"></div>
+      <div id="codeRow"><label class="f">Wiederherstellungscode</label><input class="i" name="code" autocomplete="off" autocapitalize="characters" placeholder="XXXX-XXXX-XXXX"></div>
+      ${pwField('password', 'Neues Passwort', 'new-password')}
+      ${pwField('password2', 'Neues Passwort wiederholen', 'new-password')}
+      <button class="btn primary block" style="margin-top:18px">Passwort zurücksetzen</button>
+      <button type="button" class="btn ghost block" style="margin-top:10px" data-mode="login">Zurück zur Anmeldung</button></form></div>`;
+  return `<div class="auth">${head}
+    <form id="auth" class="card" style="margin-top:20px">
+      <label class="f">Benutzername</label><input class="i" name="username" autocomplete="username" required autocapitalize="off" value="${esc(S.authUser || '')}">
+      ${pwField('password', 'Passwort', 'current-password')}
+      <button class="btn primary block" style="margin-top:18px">Anmelden</button>
+      ${S.passkeys ? '<button type="button" class="btn block" style="margin-top:10px" id="faceid">🔐 Mit Face ID anmelden</button>' : ''}
+      <button type="button" class="btn ghost block" style="margin-top:10px" data-mode="register">Neues Konto erstellen</button>
+      <button type="button" class="linkbtn" data-mode="forgot">Passwort vergessen?</button>
     </form></div>`;
 }
 function bindAuth() {
-  const f = $('#auth');
-  const submit = (path) => guard(async () => {
-    const r = await api(path, { body: { username: f.username.value, password: f.password.value } });
-    S.tab = r.user.gym_id ? 'training' : 'studio';
-    await loadAll(); render();
-    if (path === '/register') toast('Willkommen! Wähle zuerst dein Studio.');
-  })();
-  f.onsubmit = (e) => { e.preventDefault(); submit('/login'); };
-  $('#reg').onclick = () => { if (f.reportValidity()) submit('/register'); };
+  const f = $('#auth'), mode = S.authMode || 'login';
+  bindEyes(f);
+  document.querySelectorAll('[data-mode]').forEach((b) => (b.onclick = () => { S.authUser = f.username.value; S.authMode = b.dataset.mode; render(); }));
+  const done = async (r, msg) => { S.authMode = 'login'; S.tab = r.user.gym_id ? 'training' : 'studio'; await loadAll(); render(); if (msg) toast(msg);
+    if (r.recoveryCode) showRecoveryCode(r.recoveryCode); else if (r.needsRecovery) offerRecoveryCode(); };
+  const same = () => { if (f.password.value !== f.password2.value) { f.password2.focus(); throw new Error('Die Passwörter sind nicht gleich'); } };
+  f.onsubmit = guard(async (e) => {
+    e.preventDefault();
+    if (mode === 'register') { same(); await done(await api('/register', { body: { username: f.username.value, password: f.password.value } }), 'Willkommen! Wähle zuerst dein Studio.'); }
+    else if (mode === 'forgot') { same(); await done(await api('/recover', { body: { username: f.username.value, code: f.code.value, password: f.password.value } }), 'Neues Passwort gesetzt'); }
+    else await done(await api('/login', { body: { username: f.username.value, password: f.password.value } }));
+  });
+  if (mode === 'forgot') {
+    const info = guard(async () => {
+      const r = await api('/recover-info?username=' + encodeURIComponent(f.username.value)); const el = $('#recInfo'); if (!el) return;
+      $('#codeRow').style.display = r.legacy ? 'none' : '';
+      el.innerHTML = !f.username.value ? '' : !r.exists ? 'Kein Konto mit diesem Namen auf diesem Gerät.'
+        : r.legacy ? '✅ Dieses Konto ist das einzige auf dem Gerät und hat noch keinen Wiederherstellungscode – du kannst das Passwort einmalig direkt neu setzen. Danach bekommst du einen Code.'
+        : r.hasCode ? 'Gib den Wiederherstellungscode ein, den du beim Anlegen gespeichert hast.' + (r.otherAdmins ? ' Alternativ kann ein Admin dein Passwort zurücksetzen.' : '')
+        : 'Kein Wiederherstellungscode vorhanden.' + (r.otherAdmins ? ' Bitte einen Admin, dein Passwort im Profil → Admin → Benutzer zurückzusetzen.' : '');
+    });
+    f.username.oninput = info; info();
+  }
+  if ($('#faceid')) $('#faceid').onclick = guard(async () => { await done(await api('/login-passkey', { body: { id: await passkeyGet() } })); });
+}
+// ---- recovery code & Face ID helpers ----
+function showRecoveryCode(code) {
+  const sh = sheet(`<h2>Dein Wiederherstellungscode</h2>
+    <p class="small">Damit kannst du dein Passwort zurücksetzen, falls du es vergisst. Er wird <b>nur jetzt</b> angezeigt.</p>
+    <div class="reccode">${esc(code)}</div>
+    <div class="grid2"><button class="btn" id="cpy">Kopieren</button><button class="btn" id="shr">Sichern / Teilen</button></div>
+    <p class="muted small">Am besten: in der App „Passwörter“ als Notiz zum FitCrew-Eintrag speichern oder einen Screenshot machen.</p>
+    <label class="row small" style="margin-top:10px"><input type="checkbox" id="ok"> Ich habe den Code gespeichert</label>
+    <button class="btn primary block" style="margin-top:12px" id="close" disabled>Fertig</button>`);
+  sh.previousElementSibling.onclick = null; // must confirm
+  $('#cpy', sh).onclick = () => navigator.clipboard?.writeText(code).then(() => toast('Kopiert'), () => toast('Kopieren nicht möglich', true));
+  $('#shr', sh).onclick = () => navigator.share ? navigator.share({ title: 'FitCrew Wiederherstellungscode', text: `FitCrew (${S.user.username}) – Wiederherstellungscode: ${code}` }).catch(() => {}) : toast('Teilen nicht verfügbar', true);
+  $('#ok', sh).onchange = (e) => ($('#close', sh).disabled = !e.target.checked);
+  $('#close', sh).onclick = () => { closeSheet(); if (!S.user.passkey && window.PublicKeyCredential) offerFaceId(); };
+}
+function offerRecoveryCode() {
+  sheet(`<h2>Konto absichern</h2><p class="small">Dein Konto hat noch keinen Wiederherstellungscode. Ohne Code kannst du dich aussperren, wenn du das Passwort vergisst.</p>
+    <button class="btn primary block" id="mk">Code jetzt erstellen</button>`, (sh) => ($('#mk', sh).onclick = () => { closeSheet(); go('profile'); setTimeout(() => $('#newRec')?.click(), 300); }));
+}
+function offerFaceId() {
+  sheet(`<h2>Face ID einrichten?</h2><p class="small">Dann meldest du dich ohne Passwort per Face ID an – Vertippen unmöglich.</p>
+    <button class="btn primary block" id="fid">Face ID einrichten</button><button class="btn ghost block" style="margin-top:10px" id="later">Später</button>`,
+    (sh) => { $('#fid', sh).onclick = guard(setupFaceId); $('#later', sh).onclick = closeSheet; });
+}
+const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64u = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+async function setupFaceId() {
+  if (!window.PublicKeyCredential) throw new Error('Face ID wird hier nicht unterstützt');
+  const cred = await navigator.credentials.create({ publicKey: {
+    challenge: crypto.getRandomValues(new Uint8Array(32)), rp: { name: 'FitCrew' },
+    user: { id: new TextEncoder().encode('fitcrew-' + S.user.id + '-' + S.user.username), name: S.user.username, displayName: S.user.username },
+    pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+    authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' }, timeout: 60000 } });
+  await api('/me/passkey', { body: { id: b64u(cred.rawId) } });
+  S.user = (await api('/me')).user; closeSheet(); toast('Face ID eingerichtet ✓'); if (S.tab === 'profile') render();
+}
+async function passkeyGet() {
+  const { ids } = await api('/passkeys');
+  const cred = await navigator.credentials.get({ publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), userVerification: 'required', timeout: 60000,
+    allowCredentials: ids.map((id) => ({ type: 'public-key', id: unb64u(id) })) } });
+  return b64u(cred.rawId);
 }
 function logout() { api('/logout', { method: 'POST' }).catch(() => {}); S.user = null; render(); }
 
@@ -558,6 +640,12 @@ function profileView() {
       <label class="f">Ernährung</label><input class="i" name="diet" placeholder="z. B. vegetarisch, laktosefrei, mag keinen Fisch" value="${esc(p.diet || '')}">
       <label class="f">Verletzungen / Einschränkungen</label><input class="i" name="limits" placeholder="z. B. Knie links, Bandscheibe" value="${esc(p.limits || '')}">
       <button class="btn primary block" style="margin-top:16px">Speichern</button></form>
+    <h2>Sicherheit</h2>
+    <div class="card">
+      <div class="row"><div class="grow"><b>Wiederherstellungscode</b><div class="muted small">${S.user.hasRecovery ? 'Vorhanden – neuer Code macht den alten ungültig.' : '⚠️ Noch keiner – bitte erstellen!'}</div></div><button class="btn sm" id="newRec">Neu</button></div>
+      <div class="row" style="margin-top:12px"><div class="grow"><b>Face ID</b><div class="muted small">${S.user.passkey ? 'Eingerichtet ✓' : 'Anmelden ohne Passwort'}</div></div><button class="btn sm" id="fidSet">${S.user.passkey ? 'Erneut' : 'Einrichten'}</button></div>
+      <div class="row" style="margin-top:12px"><div class="grow"><b>Passwort</b><div class="muted small">ändern (mit Bestätigung)</div></div><button class="btn sm" id="pwChg">Ändern</button></div>
+    </div>
     ${S.user.admin ? '<div id="admin"><h2>Admin</h2><div class="card"><div class="spinner"></div></div></div>' : ''}
     <h2>Daten</h2>
     <div class="card tight small muted">Alle Daten liegen nur auf diesem Gerät. Mach ab und zu eine Sicherung (Datei in „Dateien“ speichern).</div>
@@ -574,6 +662,17 @@ function bindProfile() {
     S.user = (await api('/me/profile', { method: 'PUT', body })).user; toast('Profil gespeichert');
   });
   $('#out').onclick = logout;
+  $('#fidSet').onclick = guard(setupFaceId);
+  $('#newRec').onclick = () => sheet(`<h2>Neuer Wiederherstellungscode</h2><form id="rf">${pwField('password', 'Zur Bestätigung: dein Passwort', 'current-password')}
+      <button class="btn primary block" style="margin-top:14px">Code erstellen</button></form>`, (sh) => { bindEyes(sh);
+    $('#rf', sh).onsubmit = guard(async (e) => { e.preventDefault(); const r = await api('/me/recovery', { body: { password: e.target.password.value } });
+      S.user = (await api('/me')).user; closeSheet(); render(); showRecoveryCode(r.recoveryCode); }); });
+  $('#pwChg').onclick = () => sheet(`<h2>Passwort ändern</h2><form id="pf2">${pwField('old', 'Aktuelles Passwort', 'current-password')}
+      ${pwField('password', 'Neues Passwort', 'new-password')}${pwField('password2', 'Neues Passwort wiederholen', 'new-password')}
+      <button class="btn primary block" style="margin-top:14px">Speichern</button></form>`, (sh) => { bindEyes(sh);
+    $('#pf2', sh).onsubmit = guard(async (e) => { e.preventDefault(); const f = e.target;
+      if (f.password.value !== f.password2.value) throw new Error('Die neuen Passwörter sind nicht gleich');
+      await api('/me/password', { method: 'PUT', body: { old: f.old.value, password: f.password.value } }); closeSheet(); toast('Passwort geändert'); }); });
   $('#exp').onclick = guard(async () => {
     const data = await api('/export');
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
@@ -611,7 +710,7 @@ async function adminPanel() {
         ${u.superAdmin ? '' : `<button class="btn sm" data-adm="${u.id}" data-val="${u.admin ? 0 : 1}">${u.admin ? 'Admin ✕' : 'Admin'}</button>`}
         ${u.superAdmin || u.id === S.user.id ? '' : `<button class="icon-btn" style="width:34px;height:34px" data-delu="${u.id}">${IC.x}</button>`}</div>`).join('')}</div>
     <form id="newu" class="card" style="margin-top:10px"><b>Benutzer anlegen</b>
-      <div class="grid2"><input class="i" name="username" placeholder="Name" required autocapitalize="off" style="margin-top:10px"><input class="i" name="password" type="password" placeholder="Passwort" required style="margin-top:10px"></div>
+      <div class="grid2"><input class="i" name="username" placeholder="Name" required autocapitalize="off" style="margin-top:10px"><input class="i" name="password" type="text" autocomplete="off" placeholder="Passwort (sichtbar)" required style="margin-top:10px"></div>
       <label class="row small" style="margin-top:10px"><input type="checkbox" name="admin"> Admin-Rechte</label>
       <button class="btn primary block" style="margin-top:10px">Anlegen</button></form>`;
   $('#saveKey').onclick = guard(async () => {
@@ -623,8 +722,11 @@ async function adminPanel() {
   $('#testKey').onclick = guard(async () => { const b = $('#testKey'); b.disabled = true; b.innerHTML = '<span class="spinner"></span>';
     try { await api('/admin/test-key', { method: 'POST' }); toast('Verbindung zu Claude funktioniert ✓'); } finally { b.disabled = false; b.textContent = 'Testen'; } });
   el.querySelectorAll('[data-pw]').forEach((b) => (b.onclick = guard(async () => {
-    const pw = prompt('Neues Passwort (min. 6 Zeichen)'); if (!pw) return;
-    await api('/admin/users/' + b.dataset.pw, { method: 'PUT', body: { password: pw } }); toast('Passwort geändert');
+    sheet(`<h2>Passwort zurücksetzen</h2><form id="apw">${pwField('password', 'Neues Passwort', 'new-password')}${pwField('password2', 'Wiederholen', 'new-password')}
+      <button class="btn primary block" style="margin-top:14px">Speichern</button></form>`, (sh) => { bindEyes(sh);
+      $('#apw', sh).onsubmit = guard(async (e) => { e.preventDefault(); const f = e.target;
+        if (f.password.value !== f.password2.value) throw new Error('Die Passwörter sind nicht gleich');
+        await api('/admin/users/' + b.dataset.pw, { method: 'PUT', body: { password: f.password.value } }); closeSheet(); toast('Passwort geändert'); }); });
   })));
   el.querySelectorAll('[data-adm]').forEach((b) => (b.onclick = guard(async () => { await api('/admin/users/' + b.dataset.adm, { method: 'PUT', body: { admin: b.dataset.val === '1' } }); adminPanel(); })));
   el.querySelectorAll('[data-delu]').forEach((b) => (b.onclick = guard(async () => {
@@ -641,6 +743,7 @@ async function adminPanel() {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   await initDb();
   try { await loadAll(); } catch { S.user = null; }
+  try { S.passkeys = (await api('/passkeys')).ids.length > 0; } catch {}
   render();
   if (S.user && S.tab === 'progress') go('progress');
 })();
