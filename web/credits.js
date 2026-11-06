@@ -29,5 +29,77 @@ export const CREDITS = {
   "author": "Aliva Sahoo",
   "license": "CC BY-SA 4.0",
   "url": "https://commons.wikimedia.org/wiki/File:Shoulder_Press.jpg"
+ },
+ "abduktor": {
+  "title": "Hip abductor machine.jpg",
+  "author": "Teemeah",
+  "license": "CC BY-SA 4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Hip_abductor_machine.jpg"
+ },
+ "bauch": {
+  "title": "JTF Pumping Iron DVIDS204608.jpg",
+  "author": "Sgt. Carmen Steinbach",
+  "license": "Public domain",
+  "url": "https://commons.wikimedia.org/wiki/File:JTF_Pumping_Iron_DVIDS204608.jpg"
+ },
+ "beinpresse": {
+  "title": "Leg press (cropped, flipped).jpg",
+  "author": "The original uploader was SlimVirgin at English Wikipedia.",
+  "license": "CC BY-SA 3.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Leg_press_(cropped,_flipped).jpg"
+ },
+ "beinstrecker": {
+  "title": "LegExtensionMachineExercise.JPG",
+  "author": "No machine-readable author provided. GeorgeStepanek assumed (based on copyright claims).",
+  "license": "CC BY-SA 3.0",
+  "url": "https://commons.wikimedia.org/wiki/File:LegExtensionMachineExercise.JPG"
+ },
+ "bizeps": {
+  "title": "PreacherBenchBicepsCurl.JPG",
+  "author": "No machine-readable author provided. GeorgeStepanek assumed (based on copyright claims).",
+  "license": "CC BY-SA 3.0",
+  "url": "https://commons.wikimedia.org/wiki/File:PreacherBenchBicepsCurl.JPG"
+ },
+ "crosstrainer": {
+  "title": "Elliptical machine.jpg",
+  "author": "No machine-readable author provided. Cpetro45 assumed (based on copyright claims).",
+  "license": "CC BY-SA 3.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Elliptical_machine.jpg"
+ },
+ "indoorcycling": {
+  "title": "Red Exercise bike2.jpg",
+  "author": "CNEcija12345",
+  "license": "CC BY-SA 4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Red_Exercise_bike2.jpg"
+ },
+ "kabelzug": {
+  "title": "Chest flies with cable machine - cable crossover flies.jpg",
+  "author": "Nenad Stojkovic",
+  "license": "CC BY 2.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Chest_flies_with_cable_machine_-_cable_crossover_flies.jpg"
+ },
+ "laufband": {
+  "title": "Treadmill-gym.jpg",
+  "author": "GhoziSeptiandri",
+  "license": "CC BY-SA 4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Treadmill-gym.jpg"
+ },
+ "rudergeraet": {
+  "title": "Rowing machine.jpg",
+  "author": "rrafson",
+  "license": "CC BY-SA 3.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Rowing_machine.jpg"
+ },
+ "smith": {
+  "title": "SmithMachineBenchPress.JPG",
+  "author": "No machine-readable author provided. GeorgeStepanek assumed (based on copyright claims).",
+  "license": "CC BY-SA 3.0",
+  "url": "https://commons.wikimedia.org/wiki/File:SmithMachineBenchPress.JPG"
+ },
+ "waden": {
+  "title": "SeatedCalfRaiseMachineExercise.JPG",
+  "author": "George Stepanek",
+  "license": "CC BY-SA 3.0",
+  "url": "https://commons.wikimedia.org/wiki/File:SeatedCalfRaiseMachineExercise.JPG"
  }
 };
