@@ -2,7 +2,10 @@
 import { Anthropic } from './vendor/anthropic.mjs';
 
 const client = (s) => new Anthropic({ apiKey: s.apiKey, dangerouslyAllowBrowser: true, timeout: 180_000, maxRetries: 1 });
-const MODEL = (s) => s.model || 'claude-opus-5-5';
+export const DEFAULT_MODEL = 'claude-haiku-5-5';
+const MODEL = (s) => s.model || DEFAULT_MODEL;
+// Server-side refusal fallbacks exist for Opus/Fable/Sonnet 5.5, not for Haiku 5.5.
+const HAS_FALLBACK = /^claude-(opus|fable|sonnet-5-5)/;
 
 const obj = (properties, required = Object.keys(properties)) => ({ type: 'object', properties, required, additionalProperties: false });
 const S = { type: 'string' }, N = { type: 'number' }, I = { type: 'integer' };
@@ -38,7 +41,7 @@ Regeln:
 
 export async function testKey(settings) {
   try {
-    await client(settings).messages.create({ model: MODEL(settings), max_tokens: 16, output_config: { effort: 'low' }, messages: [{ role: 'user', content: 'Antworte nur mit OK.' }] });
+    await client(settings).messages.create({ model: MODEL(settings), max_tokens: 512, output_config: { effort: 'low' }, messages: [{ role: 'user', content: 'Antworte nur mit OK.' }] });
   } catch (e) { throw new Error(explain(e)); }
 }
 
@@ -61,13 +64,17 @@ export async function aiPlan(settings, ctx, goal, targets, wish) {
   };
   let msg;
   try {
-    msg = await client(settings).beta.messages.stream({
-      model: MODEL(settings), max_tokens: 32000,
-      betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',
+    const model = MODEL(settings);
+    const req = {
+      model, max_tokens: 32000,
       output_config: { effort: 'medium', format: { type: 'json_schema', schema: SCHEMA } },
       system: SYSTEM,
       messages: [{ role: 'user', content: 'Erstelle meinen Plan. Daten (JSON):\n' + JSON.stringify(data) }],
-    }).finalMessage();
+    };
+    const c = client(settings);
+    msg = HAS_FALLBACK.test(model)
+      ? await c.beta.messages.stream({ ...req, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }).finalMessage()
+      : await c.messages.stream(req).finalMessage();
   } catch (e) { throw new Error(explain(e)); }
   if (msg.stop_reason === 'refusal') throw new Error('Anfrage abgelehnt');
   if (msg.stop_reason === 'max_tokens') throw new Error('Antwort abgeschnitten');

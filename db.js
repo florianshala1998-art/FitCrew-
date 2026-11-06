@@ -312,7 +312,7 @@ route('GET', '/suggestions', true, ({ user }) => ({ suggestions: suggestions(con
 // admin: settings (Anthropic key) + user management
 const aiReady = () => !!(T.settings.aiEnabled && T.settings.apiKey);
 route('GET', '/admin/settings', true, ({ user }) => { adminOnly(user); const s = T.settings;
-  return { aiEnabled: !!s.aiEnabled, hasKey: !!s.apiKey, keyHint: s.apiKey ? s.apiKey.slice(0, 10) + '…' + s.apiKey.slice(-4) : '', model: s.model || 'claude-opus-5-5' }; });
+  return { aiEnabled: !!s.aiEnabled, hasKey: !!s.apiKey, keyHint: s.apiKey ? s.apiKey.slice(0, 10) + '…' + s.apiKey.slice(-4) : '', model: s.model || 'claude-haiku-5-5' }; });
 route('PUT', '/admin/settings', true, ({ user, body }) => {
   adminOnly(user);
   if (typeof body.apiKey === 'string') { const k = body.apiKey.trim(); need(!k || /^sk-ant-/.test(k), 400, 'Der Schlüssel beginnt mit „sk-ant-“'); T.settings.apiKey = k; }
