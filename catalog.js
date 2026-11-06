@@ -29,7 +29,7 @@ export const CATALOG = {
   beinpresse: M('Beinpresse', 'Beine', { quads: 1, glutes: 0.7, hamstrings: 0.4, adductors: 0.3 }, 1.0, '3×10–12', 'Füße schulterbreit, Knie zeigen über die Zehen, unten nicht den Po abheben.'),
   beinstrecker: M('Beinstrecker', 'Beine', { quads: 1 }, 0.35, '3×12–15', 'Polster knapp über dem Fußgelenk, Knie auf Höhe der Drehachse.'),
   beinbeuger: M('Beinbeuger', 'Beine', { hamstrings: 1, calves: 0.3 }, 0.3, '3×10–12', 'Polster über der Ferse, Fersen Richtung Po ziehen, langsam ablassen.'),
-  adduktor: M('Adduktoren-Maschine', 'Beine', { adductors: 1 }, 0.4, '3×12–15', 'Beine gegen den Widerstand zusammendrücken, kontrolliert öffnen.'),
+  adduktor: M('Adduktoren-Maschine', 'Beine', { adductors: 1 }, 0.4, '3×12–15', 'Beine gegen den Widerstand zusammendrücken, kontrolliert öffnen.', { photoOf: 'abduktor' }),
   abduktor: M('Abduktoren-Maschine', 'Po', { glutes: 1 }, 0.4, '3×12–15', 'Knie nach außen drücken, leicht nach vorne lehnen für mehr Po.'),
   hipthrust: M('Hip-Thrust-Maschine', 'Po', { glutes: 1, hamstrings: 0.5 }, 0.6, '3×10–12', 'Rücken am Polster, Hüfte ganz nach oben strecken, oben Po anspannen.'),
   waden: M('Wadenmaschine', 'Beine', { calves: 1 }, 0.6, '3×12–20', 'Fersen tief absenken, dann auf die Zehenspitzen drücken – oben kurz halten.'),
