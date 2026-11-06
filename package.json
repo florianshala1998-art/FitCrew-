@@ -1,0 +1,16 @@
+{
+  "name": "fitcrew",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "FitCrew – Studio-Geräte teilen, Fortschritt tracken, KI-Trainings- und Ernährungsplan",
+  "scripts": {
+    "start": "node --no-warnings server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
+  }
+}

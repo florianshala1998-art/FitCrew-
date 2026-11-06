@@ -1,0 +1,9 @@
+#!/bin/bash
+# Serve the offline FitCrew app (web/) on localhost if needed, then open it as an app window.
+PORT=8787
+APP_DIR="$(dirname "$(readlink -f "$0")")/web"
+if ! curl -fs -o /dev/null "http://localhost:$PORT/manifest.webmanifest"; then
+  setsid python3 -m http.server "$PORT" --bind 127.0.0.1 --directory "$APP_DIR" >/dev/null 2>&1 < /dev/null &
+  for _ in $(seq 30); do curl -fs -o /dev/null "http://localhost:$PORT/manifest.webmanifest" && break; sleep 0.2; done
+fi
+[ "$1" = "--server-only" ] || exec omarchy-launch-webapp "http://localhost:$PORT/"
